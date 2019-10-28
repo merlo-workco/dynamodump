@@ -551,8 +551,7 @@ def do_backup(dynamo, read_capacity, tableQueue=None, srcTable=None):
                 ]
             }
         }
-        logging.info("Scan filter: " + json.dumps(scanFilter, indent = 4))
-
+        
     if srcTable:
         table_name = srcTable
 
