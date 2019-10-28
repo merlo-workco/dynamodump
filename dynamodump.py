@@ -536,18 +536,22 @@ def do_backup(dynamo, read_capacity, tableQueue=None, srcTable=None):
     """
     
     scanFilter=None
-    if args.dateFilter:
-        now = datetime.datetime.now().strftime('%FT%T+00:00')
-        dateFilter = datetime.datetime.strptime(args.dateFilter, '%Y-%m-%d').strftime('%FT%TZ')
+    if args.dateFilterField and args.dateFilterSince:
+        since = datetime.datetime.strptime(args.dateFilterSince, '%Y-%m-%d').strftime('%FT%TZ')
+        until = datetime.datetime.now().strftime('%FT%TZ')
+        if args.dateFilterUntil:
+            until = datetime.datetime.strptime(args.dateFilterUntil, '%Y-%m-%d').strftime('%FT%TZ')
+
         scanFilter = {
-            "createdAt": {
+            args.dateFilterField: {
                 "ComparisonOperator": "BETWEEN",
                 "AttributeValueList": [
-                    {"S": dateFilter},
-                    {"S": now}
+                    {"S": since},
+                    {"S": until}
                 ]
             }
         }
+        logging.info("Scan filter: " + json.dumps(scanFilter, indent = 4))
 
     if srcTable:
         table_name = srcTable
@@ -592,6 +596,7 @@ def do_backup(dynamo, read_capacity, tableQueue=None, srcTable=None):
 
                 while True:
                     try:
+
                         scanned_table = dynamo.scan(table_name,
                                                     scan_filter=scanFilter,
                                                     exclusive_start_key=last_evaluated_key)                   
@@ -841,8 +846,12 @@ def main():
                         help="Destination DynamoDB table name to backup or restore to, "
                         "use 'tablename*' for wildcard prefix selection "
                         "(defaults to use '-' separator) [optional, defaults to source]")
-    parser.add_argument("--dateFilter", help="Specify a date filter on table backup "
-                        "e.g. '1980-07-27' [optional]")                        
+    parser.add_argument("--dateFilterField", help="Specify a date filter field on table backup "
+                        "e.g. 'updateAt' [optional]")
+    parser.add_argument("--dateFilterSince", help="Specify a since date filter on table backup"
+                        "e.g. '1980-07-27' [optional]")    
+    parser.add_argument("--dateFilterUntil", help="Specify a until date filter on table backup "
+                        "e.g. '1980-08-27' [optional]")                                                                            
     parser.add_argument("--prefixSeparator", help="Specify a different prefix separator, "
                         "e.g. '.' [optional]")
     parser.add_argument("--noSeparator", action='store_true',
