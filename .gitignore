@@ -37,3 +37,7 @@ nosetests.xml
 
 dump
 dynamodump.iml
+.venv
+.vscode
+env
+cp*.sh

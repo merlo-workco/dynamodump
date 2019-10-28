@@ -534,6 +534,20 @@ def do_backup(dynamo, read_capacity, tableQueue=None, srcTable=None):
     """
     Connect to DynamoDB and perform the backup for srcTable or each table in tableQueue
     """
+    
+    scanFilter=None
+    if args.dateFilter:
+        now = datetime.datetime.now().strftime('%FT%T+00:00')
+        dateFilter = datetime.datetime.strptime(args.dateFilter, '%Y-%m-%d').strftime('%FT%TZ')
+        scanFilter = {
+            "createdAt": {
+                "ComparisonOperator": "BETWEEN",
+                "AttributeValueList": [
+                    {"S": dateFilter},
+                    {"S": now}
+                ]
+            }
+        }
 
     if srcTable:
         table_name = srcTable
@@ -579,7 +593,8 @@ def do_backup(dynamo, read_capacity, tableQueue=None, srcTable=None):
                 while True:
                     try:
                         scanned_table = dynamo.scan(table_name,
-                                                    exclusive_start_key=last_evaluated_key)
+                                                    scan_filter=scanFilter,
+                                                    exclusive_start_key=last_evaluated_key)                   
                     except ProvisionedThroughputExceededException:
                         logging.error("EXCEEDED THROUGHPUT ON TABLE " +
                                       table_name + ".  BACKUP FOR IT IS USELESS.")
@@ -691,7 +706,7 @@ def do_restore(dynamo, sleep_interval, source_table, destination_table, write_ca
         wait_for_active_table(dynamo, destination_table, "created")
     else:
         # update provisioned capacity
-        if int(write_capacity) > original_write_capacity:
+        if not args.skipThroughputUpdate and int(write_capacity) > original_write_capacity:
             update_provisioned_throughput(dynamo,
                                           destination_table,
                                           original_read_capacity,
@@ -826,6 +841,8 @@ def main():
                         help="Destination DynamoDB table name to backup or restore to, "
                         "use 'tablename*' for wildcard prefix selection "
                         "(defaults to use '-' separator) [optional, defaults to source]")
+    parser.add_argument("--dateFilter", help="Specify a date filter on table backup "
+                        "e.g. '1980-07-27' [optional]")                        
     parser.add_argument("--prefixSeparator", help="Specify a different prefix separator, "
                         "e.g. '.' [optional]")
     parser.add_argument("--noSeparator", action='store_true',
